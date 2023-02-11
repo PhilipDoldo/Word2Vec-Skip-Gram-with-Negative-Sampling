@@ -158,11 +158,10 @@ def get_unigram_probabilities(center_word_index, words, window_size, scale=0.75)
     
     word_counts = get_word_counts(words)
     
-    count = word_counts[w]**scale
     scaled_word_counts = dict((w, word_counts[w]**scale) for w in word_counts.keys() if w not in ignored_words)
-    total = sum(scaled_word_counts).values
+    total = sum(scaled_word_counts.values())
     
-    return dict((w, scaled_word_counts[w]/total) for w in scaled_word_dict.keys())
+    return dict((w, scaled_word_counts[w]/total) for w in scaled_word_counts.keys())
     
     
 def get_negative_sample(unigram_probabilities):
