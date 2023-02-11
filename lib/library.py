@@ -102,7 +102,7 @@ def get_context_word_indices(center_word_index, words, window_size):
     as well store the indices rather than the words themselves because indices
     will take up less memory than strings, so this saves on storage. 
     
-    If I store the strings I no longer need the list of words. Storing the
+    EDIT: If I store the strings I no longer need the list of words. Storing the
     strings is simpler, so I will probably do that instead.
     """
     
