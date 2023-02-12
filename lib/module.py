@@ -186,7 +186,7 @@ def get_negative_sample(unigram_probabilities):
     
 def get_negative_samples(unigram_probabilities, number_of_samples):
     """
-    returns a set containing number_of_samples words
+    returns a list containing number_of_samples words
     
     Parameters:
     ----------
@@ -209,7 +209,7 @@ def get_negative_samples(unigram_probabilities, number_of_samples):
         w = get_negative_sample(unigram_probabilities)
         negative_samples.add(w)
     
-    return negative_samples
+    return list(negative_samples)
 
 
 def initialize_embeddings(words, embedding_dimension, mean=0, std=1):
@@ -269,9 +269,9 @@ def initialize_training_data(words, window_size, k=2, scale=0.75):
     for center_word_index, center_word in enumerate(words):
         
         context_words = get_context_words(center_word_index, words, window_size)
-        unigram_probabilities = get_unigram_probabilities(center_word_index, words, window_size, scale=0.75)
+        unigram_probabilities = get_unigram_probabilities(center_word_index, words, window_size, scale=scale)
         
-        negative_samples = get_negative_samples(unigram_probabilities, number_of_samples=k)
+        negative_samples = get_negative_samples(unigram_probabilities, number_of_samples=k*len(context_words))
         
         for i, context_word in enumerate(context_words):
         
@@ -322,18 +322,18 @@ def get_gradients(training_point, center_embeddings, context_embeddings):
     context_gradients = {}
     
     # Center Word Gradient
-    center_gradient = sigmoid(np.dot( context_embeddings[context_word], center_embeddings[center_word] ) - 1)*context_embeddings[context_word]
+    center_grad = sigmoid(np.dot( context_embeddings.loc[context_word], center_embeddings.loc[center_word] ) - 1)*context_embeddings.loc[context_word]
     for negative_word in negative_words:
-        center_gradient += sigmoid(np.dot( context_embeddings[negative_word], center_embeddings[center_word] ))*context_embeddings[negative_word]
+        center_grad += sigmoid(np.dot( context_embeddings.loc[negative_word], center_embeddings.loc[center_word] ))*context_embeddings.loc[negative_word]
         
-    center_gradient[center_word] = center_gradient
+    center_gradient[center_word] = center_grad
     
     # Positive Context Gradient
     context_gradients[context_word] = (sigmoid(np.dot( context_embeddings.loc[context_word], center_embeddings.loc[center_word] )) - 1)*center_embeddings.loc[center_word]
     
     # Negative Context Gradients
     for negative_word in negative_words:
-        context_gradients[negative_word] = sigmoid(dp.dot( context_embeddings[negative_word], center_embeddings[center_word] ))*center_embeddings[center_word]
+        context_gradients[negative_word] = sigmoid(np.dot( context_embeddings.loc[negative_word], center_embeddings.loc[center_word] ))*center_embeddings.loc[center_word]
     
     return center_gradient, context_gradients
 
@@ -375,7 +375,7 @@ def get_batch_gradients(training_points, center_embeddings, context_embeddings):
     
     for training_point in training_points:
         center_gradient, context_gradients = get_gradients(training_point, center_embeddings, context_embeddings)
-        
+
         for center_word in center_gradient.keys():
             if center_word not in center_updates.keys():
                 center_updates[center_word] = center_gradient[center_word]
@@ -437,13 +437,14 @@ def update_embeddings(training_data, center_embeddings, context_embeddings, batc
         center_updates, context_updates = get_batch_gradients(training_points, center_embeddings, context_embeddings)
         
         for center_word in center_updates.keys():
+            
             center_embeddings.loc[center_word] -= learning_rate * center_updates[center_word]
         
         for context_word in context_updates.keys():
             context_embeddings.loc[context_word] -= learning_rate * context_updates[context_word]
         
         
-        if verbose:
+        if verbose and (i%(10**(int(np.ceil(np.log10(len(training_data)/batch_size)))-1)) == 0 or i == len(training_data)-1):
             print(f" ---- {min(batch_size*i + batch_size, len(training_data))} / {len(training_data)} completed")
         
         
@@ -498,6 +499,7 @@ def train_embeddings(training_data, center_embeddings, context_embeddings, batch
         
         if verbose:
             print(f"CURRENT EPOCH: {epoch_index+1} / {num_epochs}")
+            #print(f"{center_embeddings.loc['store']}")
         
         np.random.shuffle(training_data) 
         
@@ -512,4 +514,4 @@ def train_embeddings(training_data, center_embeddings, context_embeddings, batch
         
     return center_embeddings, context_embeddings
 
-
+# TODO: implement a loss function for every individual center word, can sum them for overall loss and use this as a metric to examine during training
