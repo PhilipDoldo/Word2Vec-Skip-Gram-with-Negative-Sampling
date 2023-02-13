@@ -215,19 +215,13 @@ def get_negative_samples(unigram_probabilities, number_of_samples):
 
 def initialize_embeddings(words, embedding_dimension, mean=0, std=1):
     """
-    TODO: change `words` to `unique_words` to indicate repeats are removed, then
-    remember to fix the script to keep both words and unique_words, also go through
-    all other functions below this point and do the same thing where applicable
-    (words is just used for setting the indices here)
-    
     returns two pandas dataframes containing randomly initialized values 
     corresponding to all of the center embeddings and context embeddings
     
     Parameters:
     ----------
-    unique_words: list
-        This is a list of strings where each string is a word where no words
-        are repeated
+    words: list
+        This is a list of strings where each string is a word
     embedding_dimension: int
         The dimension of the word embeddings
     mean: float
@@ -236,11 +230,13 @@ def initialize_embeddings(words, embedding_dimension, mean=0, std=1):
         The standard deviation of the normal distribution used to initialize
         the embeddings
     """
-    center_embeddings = np.random.normal(loc=mean, scale=std, size=(len(words), embedding_dimension))
-    center_embeddings = pd.DataFrame(data=center_embeddings, index=words)
+    unique_words = list(set(words)) # list of words with no repeats
+    
+    center_embeddings = np.random.normal(loc=mean, scale=std, size=(len(unique_words), embedding_dimension))
+    center_embeddings = pd.DataFrame(data=center_embeddings, index=unique_words)
 
-    context_embeddings = np.random.normal(loc=mean, scale=std, size=(len(words), embedding_dimension))
-    context_embeddings = pd.DataFrame(data=context_embeddings, index=words)
+    context_embeddings = np.random.normal(loc=mean, scale=std, size=(len(unique_words), embedding_dimension))
+    context_embeddings = pd.DataFrame(data=context_embeddings, index=unique_words)
     
     return center_embeddings, context_embeddings
 
