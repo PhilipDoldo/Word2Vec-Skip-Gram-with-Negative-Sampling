@@ -1,4 +1,5 @@
 import lib.module as module
+import matplotlib.pyplot as plt
 
 import numpy as np
 np.random.seed(0)
@@ -6,10 +7,7 @@ np.random.seed(0)
 
 if __name__ == "__main__":
     
-    # TODO: load data as a big string
-    # data =
-    
-    data = "I walked to the store to buy some food which I stored in my house in the cabinet. I often try to buy things at the store so that I never run out of supplies. Buying items from the store requires money which I can use to pay with in exchange for goods. The only annoying thing about going to the store is that I need to get into my car and drive there. I'm not a big fan of driving to the store, but I try to be a responsible adult and perform this duty on a somewhat frequent basis. My ability to consistently motivate myself to go to the store has played a huge role in my success as a business owner. One might initially think that going to the store is simply a trivial task that would not eventually lead to me becoming an incredibly successful business owner, but after further reflection this individual might come to the conclusion that going to the store is actually a very important part of becoming a millionaire. It teaches you all of the skills you need to get rich, such as perseverance, moving quickly, and consistency. Do not sleep on going to the store, it will lead to your success."
+    data = "Many cities contain tall buildings such as skyscrapers or offices, which can also be skyscrapers. Skyscrapers are an example of tall buildings, but other kinds of tall buildings exist, such as banks. Banks are not actually typical examples of tall buildings as far as I am aware, but tall buildings can come in all kinds of shapes and sizes, except for sizes which are not very high in which case we would no longer classify the corresponding not tall buildings as tall buildings. Many people live in tall buildings and a lot of the time you will see birds fly onto tall buildings. There are many sights you can see from tall buildings, provided that you are high enough in the tall buildings. I know that I used the plural form of tall buildings although realistically you will probably only be within a single tall buildings at a time (I did it again) but I want tall buildings to show up in this text a lot."
     
     # process
     words = list(set(module.process_text(data).split()))
@@ -30,17 +28,54 @@ if __name__ == "__main__":
         scale=0.75
         )
     
-    print(f"{center_embeddings.loc['store']}")
     
-    # train embeddings
-    center_embeddings, context_embeddings = module.train_embeddings(
-        training_data=training_data,
-        center_embeddings=center_embeddings,
-        context_embeddings=context_embeddings,
-        batch_size=1,
-        learning_rate=.01,
-        num_epochs=10,
-        verbose=True
-        )
+    learning_schedule = list(np.linspace(.1, .001, 10))
+    losses = []
+    
+    losses.append( module.get_loss(training_data, center_embeddings, context_embeddings) )
+    
+    for epoch, learning_rate in enumerate(learning_schedule):
+        
+        print(f"==== EPOCH {epoch+1} ====")
+        
+        # train embeddings
+        center_embeddings, context_embeddings, loss = module.train_embeddings(
+            training_data=training_data,
+            center_embeddings=center_embeddings,
+            context_embeddings=context_embeddings,
+            batch_size=len(training_data),
+            learning_rate=learning_rate,
+            num_epochs=1,
+            verbose=True
+            )
+        
+        losses += loss
 
-    print(f"{center_embeddings.loc['store']}")
+    
+    plt.plot( range(0,len(learning_schedule)+1), losses )
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.show()
+    
+    plt.plot( range(len(learning_schedule)+1), losses )
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.ylim(top=losses[min(3, len(losses)-1)])
+    plt.show()
+    
+    w='tall'
+    print(f"Closest words to {w}:\n{module.find_closest_words(w, center_embeddings + context_embeddings).iloc[0:10]}")
+    
+    w='buildings'
+    print(f"Closest words to {w}:\n{module.find_closest_words(w, center_embeddings + context_embeddings).iloc[0:10]}")
+    
+    module.plot_2d_grid(center_embeddings + context_embeddings)
+    
+    """
+    From the 2d grid plot, we can see that the word embeddings have formed some
+    sort of structure and words such as "tall" and "buildings" are close to
+    each other which lines up with the fact that the phrase "tall buildings"
+    was intentionally placed within the training text multiple times. This 
+    similarity between words being captured was achieved without even trying to
+    optimize training very much.
+    """

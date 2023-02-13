@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import string
+import matplotlib.pyplot as plt
 
 
 def process_text(s):
@@ -281,6 +282,35 @@ def initialize_training_data(words, window_size, k=2, scale=0.75):
     return training_data
 
 
+def unpack_training_point(training_point):
+    """
+    given a training point, returns the center word (string), context word
+    (string), and list of negative words (list of strings)
+    
+    Parameters:
+    ----------
+    training_point: dict
+        Contains a key "center" corresponding to the center word, a key
+        "context" corresponding to a single context word, and a key "negative"
+        corresponding to a list of words which are negative context samples
+        (i.e. samples of words not within the context of the center word)
+    
+    
+    Notes:
+    -----
+    The only reason I'm writing this function is because I want to reduce
+    repeated code and the keys of the dictionary are specific strings, so it
+    is more manageable to only use them in this function if I ever decided to
+    change them for some reason.
+    """
+    
+    center_word = training_point['center']
+    context_word = training_point['context']
+    negative_words = training_point['negative']
+
+    return center_word, context_word, negative_words
+
+
 def get_gradients(training_point, center_embeddings, context_embeddings):
     """
     for a given training point, returns the center word gradient (stored in a 
@@ -314,9 +344,7 @@ def get_gradients(training_point, center_embeddings, context_embeddings):
     context word. 
     """
     
-    center_word = training_point['center']
-    context_word = training_point['context']
-    negative_words = training_point['negative']
+    center_word, context_word, negative_words = unpack_training_point(training_point)
     
     center_gradient = {}
     context_gradients = {}
@@ -391,6 +419,91 @@ def get_batch_gradients(training_points, center_embeddings, context_embeddings):
     return center_updates, context_updates
 
 
+def get_training_point_loss(training_point, center_embeddings, context_embeddings):
+    """
+    for a given training point, returns the negative log probability associated
+    with it as a float
+    
+    Parameters:
+    ----------
+    training_point: dict
+        Contains a key "center" corresponding to the center word, a key
+        "context" corresponding to a single context word, and a key "negative"
+        corresponding to a list of words which are negative context samples
+        (i.e. samples of words not within the context of the center word)
+    center_embeddings: pandas DataFrame
+        Dataframe indexed by word strings, each column corresponds to a
+        different dimension of the embedding for word for that row. Contains
+        the embeddings for when words are treated as center words.
+    context_embeddings: pandas DataFrame
+        Dataframe indexed by word strings, each column corresponds to a
+        different dimension of the embedding for word for that row. Contains
+        the embeddings for when words are treated as context words.
+    
+    
+    Notes:
+    -----
+    The negative log is applied to the probability that the context word is in
+    fact a true context word multiplied by the probabilities that each of the
+    negative samples are in fact not true context words (a product is used due
+    to naive independence assumptions) where the probability of a context word,
+    whose context embedding is denoted by c, being a true context word of a 
+    center word, whose center embedding is denoted by w, is modeled as 
+    sigmoid(w^T c) (and thus the "context" words corresponding to negative 
+    samples will contribute in the form 1 - sigmoid(w^T c) which can be written
+    as sigmoid(-w^T c)).
+    """
+    
+    center_word, context_word, negative_words = unpack_training_point(training_point)
+    
+    # initialize loss as -log prob for the true context word
+    loss = -np.log( sigmoid( np.dot(center_embeddings.loc[center_word], context_embeddings.loc[context_word]) ) )
+    
+    # now add on to the loss for every negatuve word
+    for negative_word in negative_words:
+        loss += -np.log( sigmoid( - np.dot(center_embeddings.loc[center_word], context_embeddings.loc[negative_word]) ) )
+    
+    return loss
+
+
+def get_loss(training_data, center_embeddings, context_embeddings):
+    """
+    for a list of training points, returns the sum of all of the negative log
+    probabilities associated with each individual training point divided by
+    the total number of training points (i.e. returns the average loss across
+    all of the training points) as a float
+    
+    Parameters:
+    ----------
+    training_data: list
+        This is a list of dictionaries where each dictionary contains a key 
+        "center" corresponding to the center word, a key "context" 
+        corresponding to a single context word, and a key "negative"
+        corresponding to a list of words which are negative context samples
+        (i.e. samples of words not within the context of the center word)
+    center_embeddings: pandas DataFrame
+        Dataframe indexed by word strings, each column corresponds to a
+        different dimension of the embedding for word for that row. Contains
+        the embeddings for when words are treated as center words.
+    context_embeddings: pandas DataFrame
+        Dataframe indexed by word strings, each column corresponds to a
+        different dimension of the embedding for word for that row. Contains
+        the embeddings for when words are treated as context words.
+        
+    
+    Notes:
+    -----
+    The main idea is that this function is returning the overall loss when
+    taking every single training point into account (because training_data is
+    a list containing every training point and we compute the loss for each of
+    these individual training points and then add them up).
+    """
+    loss = 0
+    for training_point in training_data:
+        loss += get_training_point_loss(training_point, center_embeddings, context_embeddings)
+    return loss/len(training_data)
+
+
 def update_embeddings(training_data, center_embeddings, context_embeddings, batch_size=1, learning_rate=.01, verbose=False):
     """
     returns the center and context embeddings after a single epoch of training
@@ -444,8 +557,9 @@ def update_embeddings(training_data, center_embeddings, context_embeddings, batc
             context_embeddings.loc[context_word] -= learning_rate * context_updates[context_word]
         
         
-        if verbose and (i%(10**(int(np.ceil(np.log10(len(training_data)/batch_size)))-1)) == 0 or i == len(training_data)-1):
-            print(f" ---- {min(batch_size*i + batch_size, len(training_data))} / {len(training_data)} completed")
+        if verbose:
+            loss = get_loss(training_data=training_data, center_embeddings=center_embeddings, context_embeddings=context_embeddings)
+            print(f" ---- {min(batch_size*i + batch_size, len(training_data))} / {len(training_data)} completed -- loss: {loss:.4f}")
         
         
     return center_embeddings, context_embeddings
@@ -454,7 +568,9 @@ def update_embeddings(training_data, center_embeddings, context_embeddings, batc
 def train_embeddings(training_data, center_embeddings, context_embeddings, batch_size=1, learning_rate=.01, num_epochs=5, verbose=False):
     """
     returns the fully trained center and context word embeddings, trained using
-    minibatch gradient descent for a total of num_epochs epochs
+    minibatch gradient descent for a total of num_epochs epochs. If verbose is
+    True, then also returns a list of losses (list of floats), that is the loss
+    at the end of every epoch
     
     Parameters:
     ----------
@@ -495,11 +611,14 @@ def train_embeddings(training_data, center_embeddings, context_embeddings, batch
     the minibatches. We train minibatch SGD for however many epochs we want and
     we return both the center and context word embeddings.
     """
+    losses = []
     for epoch_index in range(num_epochs):
         
         if verbose:
+            if epoch_index == 0:
+                loss = get_loss(training_data=training_data, center_embeddings=center_embeddings, context_embeddings=context_embeddings)
+                print(f"Initial Loss: {loss:.4f}")
             print(f"CURRENT EPOCH: {epoch_index+1} / {num_epochs}")
-            #print(f"{center_embeddings.loc['store']}")
         
         np.random.shuffle(training_data) 
         
@@ -512,6 +631,36 @@ def train_embeddings(training_data, center_embeddings, context_embeddings, batch
             verbose=verbose
             )
         
-    return center_embeddings, context_embeddings
+        if verbose:
+            loss = get_loss(training_data=training_data, center_embeddings=center_embeddings, context_embeddings=context_embeddings)
+            losses.append(loss)
+            
+    if verbose == True:
+        return center_embeddings, context_embeddings, losses
+    else:
+        return center_embeddings, context_embeddings
 
-# TODO: implement a loss function for every individual center word, can sum them for overall loss and use this as a metric to examine during training
+
+def find_closest_words(word, embeddings):
+    
+    d = {}
+    for w in embeddings.index:
+        d[w] = np.linalg.norm(embeddings.loc[word] - embeddings.loc[w], 2)
+    
+    df = pd.DataFrame(data=d.values(), index=d.keys())
+    df.sort_values(by=0, inplace=True)
+    return df
+    
+
+def plot_2d_grid(embeddings):
+    
+    x = embeddings[0]
+    y = embeddings[1]
+    
+    fig, ax = plt.subplots()
+    ax.scatter(x, y)
+    
+    for w in embeddings.index:
+        ax.annotate(w, (x[w], y[w]))
+    
+    
