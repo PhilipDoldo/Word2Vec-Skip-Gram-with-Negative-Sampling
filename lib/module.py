@@ -663,4 +663,4 @@ def plot_2d_grid(embeddings):
     for w in embeddings.index:
         ax.annotate(w, (x[w], y[w]))
     
-    
+    #test
