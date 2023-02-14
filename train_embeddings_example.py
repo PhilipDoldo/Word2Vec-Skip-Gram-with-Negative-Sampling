@@ -29,7 +29,7 @@ if __name__ == "__main__":
         )
     
     
-    learning_schedule = [.02*(.99)**i for i in range(100)]
+    learning_schedule = [.02*(.99)**i for i in range(50)]
     losses = []
     
     losses.append( module.get_loss(training_data, center_embeddings, context_embeddings) )
