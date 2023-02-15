@@ -25,9 +25,15 @@ Ultimately, we want to choose the word embeddings such that we maximize the prob
 
 We define the loss $L$ corresponding to this training point to be the negative log of this probability. $$L = - \log(\sigma(v_w^T c_u)) - \sum\_{i=1}^{k} \log(\sigma(-v_w^T c\_{y_i})) $$ Without the log, we are more likely to run into limitations with floating point precision as the product of several probabilities has a higher chance of being zero up to machine precision. Our goal now is to learn word embeddings to minimize this loss using gradient descent, using all of our training points as data to train on.
 
-For reference, here are the partial derivatives of the loss $L$ with respect to the $j$-th component of each word embedding in the training point.
+For reference, here are the partial derivatives of the loss $L$ with respect to the $j$-th component of each word embedding in the training point for $j=1, ..., d$ (where we let $x^{(j)} \in \mathbb{R}$ denote the $j$-th component of $x \in \mathbb{R}^d$).
 
-TODO
+$$
+\begin{align\*}
+\frac{\partial L}{\partial v_w^{(j)}} &= (\sigma(v_w^T c_u) - 1) c_u^{(j)} + \sum\_{i=1}^{k} \sigma(v_w^T c\_{y_i}) c\_{y_i}^{(j)} \\
+\frac{\partial L}{\partial c_u^{(j)}} &= (\sigma(v_w^T c_u) - 1) v_w^{(j)}\\
+\frac{\partial L}{\partial c\_{y_i}^{(j)}} &= \sigma(v_w^T c\_{y_i}) v_w^{(j)}  \space \space \space \space \space \space \space \space \space \space \space \space \space \space  \text{ for $i = 1, ..., k$}
+\end{align\*}
+$$ 
 
 After updating all of our word embeddings using gradient descent, our final word embedding that we use to represent a word $w \in \mathcal{W}$ is the sum of its center embedding and its context embedding $v_w + c_w$. Choosing to use this sum as the final embedding is ultimately an arbitrary way of combining the information from each of the trained embeddings and other choices exist, but this one is supposedly a common choice. 
 
